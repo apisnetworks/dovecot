@@ -4,8 +4,8 @@ Summary: Secure imap and pop3 server
 Name: dovecot
 Epoch: 2
 Version: 2.2.36
-%global prever %{nil}
-Release: 1%{?dist}
+%global prever .4
+Release: 4%{?dist}
 #dovecot itself is MIT, a few sources are PD, pigeonhole is LGPLv2
 License: MIT and LGPLv2
 Group: System Environment/Daemons
@@ -224,6 +224,8 @@ mkdir -p $RPM_BUILD_ROOT/var/run/dovecot/{login,empty,token-login}
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d
 install -p -m 644 docinstall/example-config/dovecot.conf $RPM_BUILD_ROOT%{_sysconfdir}/dovecot
 install -p -m 644 docinstall/example-config/conf.d/*.conf $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d
+# Conflicts with apnscp.conf
+rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/dovecot/conf.d/10-{auth,mail}.conf $RPM_BUILD_ROOT/%{_sysconfdir}/dovecot/conf.d/15-mailboxes.conf
 install -p -m 644 $RPM_BUILD_ROOT/%{_docdir}/%{name}-pigeonhole/example-config/conf.d/*.conf $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d
 install -p -m 644 docinstall/example-config/conf.d/*.conf.ext $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d
 install -p -m 644 $RPM_BUILD_ROOT/%{_docdir}/%{name}-pigeonhole/example-config/conf.d/*.conf.ext $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d ||:
@@ -240,7 +242,6 @@ find $RPM_BUILD_ROOT%{_libdir}/%{name}/ -name '*.la' | xargs rm -f
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/README
 # No need for ldap/dict support
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/dovecot/conf.d/auth-{ldap,dict}.conf.ext
-
 pushd docinstall
 rm -f securecoding.txt thread-refs.txt
 popd
@@ -350,10 +351,8 @@ make check
 %dir %{_sysconfdir}/dovecot/conf.d
 %config(noreplace) %{_sysconfdir}/dovecot/dovecot.conf
 #list all so we'll be noticed if upstream changes anything
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-auth.conf
 %config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-director.conf
 %config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-logging.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-mail.conf
 %config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-master.conf
 %config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-ssl.conf
 %config(noreplace) %{_sysconfdir}/dovecot/conf.d/15-lda.conf
@@ -454,6 +453,9 @@ make check
 %{_mandir}/man7/pigeonhole.7*
 
 %changelog
+* Thu Aug 29 2019 Matt Saladna <matt@apisnetworks.com> - 2:2.2.36-4
+- CVE-2019-11500
+
 * Sun May 27 2018 Matt Saladna <matt@apisnetworks.com> - 2:2.2.36-1
 - Upgrade to 2.2.36. Bump epoch.
 
