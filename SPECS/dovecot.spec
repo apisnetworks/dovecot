@@ -223,12 +223,8 @@ mkdir -p $RPM_BUILD_ROOT/var/run/dovecot/{login,empty,token-login}
 # Install dovecot configuration and dovecot-openssl.cnf
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d
 install -p -m 644 docinstall/example-config/dovecot.conf $RPM_BUILD_ROOT%{_sysconfdir}/dovecot
-install -p -m 644 docinstall/example-config/conf.d/*.conf $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d
 # Conflicts with apnscp.conf
-rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/dovecot/conf.d/10-{auth,mail}.conf $RPM_BUILD_ROOT/%{_sysconfdir}/dovecot/conf.d/15-mailboxes.conf
-install -p -m 644 $RPM_BUILD_ROOT/%{_docdir}/%{name}-pigeonhole/example-config/conf.d/*.conf $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d
-install -p -m 644 docinstall/example-config/conf.d/*.conf.ext $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d
-install -p -m 644 $RPM_BUILD_ROOT/%{_docdir}/%{name}-pigeonhole/example-config/conf.d/*.conf.ext $RPM_BUILD_ROOT%{_sysconfdir}/dovecot/conf.d ||:
+#rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/dovecot/conf.d/10-{auth,mail}.conf $RPM_BUILD_ROOT/%{_sysconfdir}/dovecot/conf.d/15-mailboxes.conf
 install -p -m 644 doc/dovecot-openssl.cnf $RPM_BUILD_ROOT%{ssldir}/dovecot-openssl.cnf
 
 install -p -m755 doc/mkcert.sh $RPM_BUILD_ROOT%{_libexecdir}/%{name}/mkcert.sh
@@ -351,26 +347,8 @@ make check
 %dir %{_sysconfdir}/dovecot/conf.d
 %config(noreplace) %{_sysconfdir}/dovecot/dovecot.conf
 #list all so we'll be noticed if upstream changes anything
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-director.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-logging.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-master.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-ssl.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/15-lda.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/15-mailboxes.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/20-imap.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/20-lmtp.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/20-pop3.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/90-acl.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/90-quota.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/90-plugin.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-checkpassword.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-deny.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-master.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-passwdfile.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-sql.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-static.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-system.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-vpopmail.conf.ext
+%ghost %config(missingok,noreplace) %{_sysconfdir}/dovecot/conf.d/apnscp.conf
+# apnscp.conf is created by Bootstrap
 
 %config(noreplace) %{_sysconfdir}/pam.d/dovecot
 %config(noreplace) %{ssldir}/dovecot-openssl.cnf
@@ -430,9 +408,6 @@ make check
 %{_bindir}/sieve-filter
 %{_bindir}/sieve-test
 %{_bindir}/sievec
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/20-managesieve.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/90-sieve.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/90-sieve-extprograms.conf
 
 %{_docdir}/%{name}-pigeonhole
 
