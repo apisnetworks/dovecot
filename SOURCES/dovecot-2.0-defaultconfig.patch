@@ -1,6 +1,15 @@
 diff -up dovecot-2.2.18/doc/example-config/conf.d/10-mail.conf.default-settings dovecot-2.2.18/doc/example-config/conf.d/10-mail.conf
 --- dovecot-2.2.18/doc/example-config/conf.d/10-mail.conf.default-settings	2014-06-02 13:50:10.000000000 +0200
 +++ dovecot-2.2.18/doc/example-config/conf.d/10-mail.conf	2015-08-24 17:09:03.866648631 +0200
+@@ -165,7 +165,7 @@ namespace inbox {
+ # to make sure that users can't log in as daemons or other system users.
+ # Note that denying root logins is hardcoded to dovecot binary and can't
+ # be done even if first_valid_uid is set to 0.
+-#first_valid_uid = 500
++first_valid_uid = 1000
+ #last_valid_uid = 0
+ 
+ # Valid GID range for users, defaults to non-root/wheel. Users having
 @@ -283,6 +283,7 @@ namespace inbox {
  # them simultaneously.
  #mbox_read_locks = fcntl
