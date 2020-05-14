@@ -1,0 +1,16 @@
+diff -Nur dovecot-2.2.36-orig/src/plugins/quota/quota-fs.c dovecot-2.2.36/src/plugins/quota/quota-fs.c
+--- dovecot-2.2.36-orig/src/plugins/quota/quota-fs.c	2020-05-14 20:53:29.233365420 +0000
++++ dovecot-2.2.36/src/plugins/quota/quota-fs.c	2020-05-14 20:58:06.692372948 +0000
+@@ -45,7 +45,11 @@
+ /* Older sys/quota.h doesn't define _LINUX_QUOTA_VERSION at all, which means
+    it supports only v1 quota */
+ #ifndef _LINUX_QUOTA_VERSION
+-#  define _LINUX_QUOTA_VERSION 1
++#  if defined(__GLIBC_PREREQ) && __GLIBC_PREREQ(2,17)
++#    define _LINUX_QUOTA_VERSION 2
++#  else
++#    define _LINUX_QUOTA_VERSION 1
++#  endif
+ #endif
+ 
+ #define mount_type_is_nfs(mount) \

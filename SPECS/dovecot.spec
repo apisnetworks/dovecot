@@ -5,7 +5,7 @@ Name: dovecot
 Epoch: 2
 Version: 2.2.36
 %global prever %{nil}
-Release: 10%{?dist}
+Release: 11%{?dist}
 #dovecot itself is MIT, a few sources are PD, pigeonhole is LGPLv2
 License: MIT and LGPLv2
 Group: System Environment/Daemons
@@ -54,6 +54,7 @@ Patch19: dovecot-2.2.36-cve2019_11500_part1of4.patch
 Patch20: dovecot-2.2.36-cve2019_11500_part2of4.patch
 Patch21: dovecot-2.2.36-cve2019_11500_part3of4.patch
 Patch22: dovecot-2.2.36-cve2019_11500_part4of4.patch
+Patch99: dovecot-2.2.36-rhel8-quota.patch
 
 Source15: prestartscript
 
@@ -147,6 +148,7 @@ pushd dovecot-2*2-pigeonhole-%{pigeonholever}
 %patch21 -p1 -b .cve2019_11500_part3of4
 %patch22 -p1 -b .cve2019_11500_part4of4
 popd
+%patch99 -p1 -b .quota-rhel8
 
 #pushd dovecot-2*2-pigeonhole-%{pigeonholever}
 #popd
@@ -458,6 +460,10 @@ make check
 %{_mandir}/man7/pigeonhole.7*
 
 %changelog
+* Thu May 15 2020 Matt Saladna <matt@apisnetworks.com> - 2:2.2.36-11
+- RHEL8 backports
+- Quota misreported on ext4 + RHEL8
+
 * Thu Aug 29 2019 Matt Saladna <matt@apisnetworks.com> - 2:2.2.36-4
 - CVE-2019-11500
 
