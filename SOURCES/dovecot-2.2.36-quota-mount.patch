@@ -1,0 +1,35 @@
+From d32f4c43ddfe51fd757c15fe1821287ab5b3caf5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martti=20Rannanj=C3=A4rvi?= <martti.rannanjarvi@dovecot.fi>
+Date: Tue, 7 Nov 2017 03:57:49 +0200
+Subject: [PATCH] quota-fs: Make it possible to set the mount= parameter
+
+Also free root->storage_mount_path before copying the given parameter in
+order not to leak memory when there are duplicate mount= parameters.
+---
+ src/plugins/quota/quota-fs.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/plugins/quota/quota-fs.c b/src/plugins/quota/quota-fs.c
+index fbd80aaed3..aead675f50 100644
+--- a/src/plugins/quota/quota-fs.c
++++ b/src/plugins/quota/quota-fs.c
+@@ -114,7 +114,9 @@ static void handle_inode_param(struct quota_root *_root, const char *param_value
+ 
+ static void handle_mount_param(struct quota_root *_root, const char *param_value)
+ {
+-	((struct fs_quota_root *)_root)->storage_mount_path = i_strdup(param_value);
++	struct fs_quota_root *root = (struct fs_quota_root *)_root;
++	i_free(root->storage_mount_path);
++	root->storage_mount_path = i_strdup(param_value);
+ }
+ 
+ static int fs_quota_init(struct quota_root *_root, const char *args,
+@@ -123,7 +125,7 @@ static int fs_quota_init(struct quota_root *_root, const char *args,
+ 	const struct quota_param_parser fs_params[] = {
+ 		{.param_name = "user", .param_handler = handle_user_param},
+ 		{.param_name = "group", .param_handler = handle_group_param},
+-		{.param_name = "mount", .param_handler = handle_mount_param},
++		{.param_name = "mount=", .param_handler = handle_mount_param},
+ 		{.param_name = "inode_per_mail", .param_handler = handle_inode_param},
+ 		quota_param_hidden, quota_param_noenforcing, quota_param_ns,
+ 		{.param_name = NULL}
