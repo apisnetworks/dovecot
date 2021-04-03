@@ -138,7 +138,9 @@ This package provides the development files for dovecot.
 %patch11 -p1 -b .aclfix
 %patch12 -p1 -b .gidcheck
 %patch13 -p1 -b .bigkey
+%if %{?rhel}0 >= 80
 %patch14 -p1 -b .opensslhmac
+%endif
 %patch15 -p1 -b .cve_2019_3814part1of3
 %patch16 -p1 -b .cve_2019_3814part2of3
 %patch17 -p1 -b .cve_2019_3814part3of3
