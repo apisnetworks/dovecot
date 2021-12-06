@@ -1,0 +1,16 @@
+diff --git a/doc/mkcert.sh b/doc/mkcert.sh
+index f7e484c..fec7bd5 100644
+--- a/doc/mkcert.sh
++++ b/doc/mkcert.sh
+@@ -5,8 +5,8 @@
+ 
+ umask 077
+ OPENSSL=${OPENSSL-openssl}
+-SSLDIR=${SSLDIR-/etc/ssl}
+-OPENSSLCONFIG=${OPENSSLCONFIG-dovecot-openssl.cnf}
++SSLDIR=${SSLDIR-/etc/pki/dovecot}
++OPENSSLCONFIG=${OPENSSLCONFIG-/etc/pki/dovecot/dovecot-openssl.cnf}
+ 
+ CERTDIR=$SSLDIR/certs
+ KEYDIR=$SSLDIR/private
+

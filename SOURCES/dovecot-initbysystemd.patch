@@ -1,0 +1,54 @@
+diff --git a/Makefile.am b/Makefile.am
+index 25fb9459e4..41dde8203b 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -21,6 +21,7 @@ EXTRA_DIST = \
+ 	run-test-valgrind.supp \
+ 	dovecot.service.in \
+ 	dovecot.socket \
++	dovecot-init.service \
+ 	$(conf_DATA)
+ 
+ noinst_DATA = dovecot-config
+@@ -69,7 +70,8 @@ dovecot-config: dovecot-config.in Makefile
+ if WANT_SYSTEMD
+ systemdsystemunit_DATA = \
+         dovecot.socket \
+-        dovecot.service
++        dovecot.service \
++        dovecot-init.service
+ endif
+ 
+ install-exec-hook:
+diff --git a/dovecot-init.service b/dovecot-init.service
+new file mode 100644
+index 0000000000..f4e13f28f8
+--- /dev/null
++++ b/dovecot-init.service
+@@ -0,0 +1,12 @@
++[Unit]
++Description=One-time Dovecot init service
++ConditionPathExists=|!/etc/pki/dovecot/certs/dovecot.pem
++
++[Service]
++Type=oneshot
++RemainAfterExit=no
++ExecStart=/bin/sh -c '\
++if [ ! -f /etc/pki/dovecot/certs/dovecot.pem ]; \
++then\
++  SSLDIR=/etc/pki/dovecot/ OPENSSLCONFIG=/etc/pki/dovecot/dovecot-openssl.cnf /usr/libexec/dovecot/mkcert.sh >/dev/null 2>&1; \
++fi'
+diff --git a/dovecot.service.in b/dovecot.service.in
+index 44942342d8..c1a0c11120 100644
+--- a/dovecot.service.in
++++ b/dovecot.service.in
+@@ -11,7 +11,8 @@
+ Description=Dovecot IMAP/POP3 email server
+ Documentation=man:dovecot(1)
+ Documentation=https://doc.dovecot.org/
+-After=local-fs.target network-online.target
++After=local-fs.target network-online.target dovecot-init.service
++Requires=dovecot-init.service
+ 
+ [Service]
+ Type=@systemdservicetype@
