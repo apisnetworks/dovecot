@@ -4,6 +4,8 @@
 %bcond_without libwrap
 %endif
 
+%global _hardened_build 1
+
 %if 0%{?el6}
  %{?filter_setup:
  %filter_provides_in %{_docdir}
@@ -19,13 +21,15 @@
  %filter_setup
 }
 %endif
-%global __provides_exclude_from ^%{_docdir}/.*$ 
+%global __provides_exclude_from ^%{_docdir}/.*$
 %global __requires_exclude_from ^%{_docdir}/.*$
+%global pigeonholever 0.5.17.1
+
 Summary: Secure imap and pop3 server
 Name: dovecot
 Epoch: 2
-Version: 2.3.17
-Release: 3
+Version: 2.3.17.1
+Release: 1
 #dovecot itself is MIT, a few sources are PD, pigeonhole is LGPLv2
 License: MIT and LGPLv2
 Group: System Environment/Daemons
@@ -34,6 +38,7 @@ URL: http://www.dovecot.org/
 Source: %{name}_%{version}.orig.tar.gz
 Source1: dovecot.init
 Source2: dovecot.pam
+Source8: http://pigeonhole.dovecot.org/releases/2.3/dovecot-2.3-pigeonhole-%{pigeonholever}.tar.gz
 Source9: dovecot.sysconfig
 Source10: dovecot.tmpfilesd
 
@@ -60,7 +65,7 @@ BuildRequires: libtool, autoconf, automake, pkgconfig
 BuildRequires: sqlite-devel
 BuildRequires: postgresql-devel
 %if 0%{?rhel} >= 8
-BuildRequires: mariadb-devel
+BuildRequires: MariaDB-devel
 %else
 BuildRequires: mysql-devel
 %endif
@@ -120,11 +125,20 @@ Conflicts: dovecot-sqlite > %{epoch}:%{version}-%{release}, dovecot-ldap > %{epo
 %global restart_flag /var/run/%{name}/%{name}-restart-after-rpm-install
 
 %description
-Dovecot is an IMAP server for Linux/UNIX-like systems, written with security 
-primarily in mind.  It also contains a small POP3 server.  It supports mail 
+Dovecot is an IMAP server for Linux/UNIX-like systems, written with security
+primarily in mind.  It also contains a small POP3 server.  It supports mail
 in either of maildir or mbox formats.
 
 The SQL drivers and authentication plug-ins are in their subpackages.
+
+%package pigeonhole
+Requires: %{name} = %{epoch}:%{version}-%{release}
+Summary: Sieve and managesieve plug-in for dovecot
+Group: System Environment/Daemons
+License: MIT and LGPLv2
+
+%description pigeonhole
+This package provides sieve and managesieve plug-in for dovecot LDA.
 
 %package pgsql
 Requires: %{name} = %{epoch}:%{version}-%{release}
@@ -165,7 +179,7 @@ This package provides LUA scripting support for Dovecot Community Edition
 
 
 %prep
-%setup -q -n %{name}-%{version}
+%setup -q -n %{name}-%{version} -a 8
 #%patch1 -p1 -b .default-settings
 #%patch2 -p1 -b .mkcert-permissions
 %patch3 -p1 -b .mkcert
@@ -180,7 +194,6 @@ sed -i '/DEFAULT_INCLUDES *=/s|$| '"$(pkg-config --cflags libclucene-core)|" src
 
 %build
 #required for fdpass.c line 125,190: dereferencing type-punned pointer will break strict-aliasing rules
-#%global _hardened_build 1
 #export CFLAGS="%{__global_cflags} -fno-strict-aliasing"
 #export LDFLAGS="-Wl,-z,now -Wl,-z,relro %{?__global_ldflags}"
 # el6 autoconf too old to regen; use packaged files (#1082384)
@@ -230,13 +243,36 @@ fi
 
 make %{?_smp_mflags}
 
+#pigeonhole
+pushd dovecot-2*3-pigeonhole-%{pigeonholever}
+
+# required for snapshot
+[ -f configure ] || autoreconf -fiv
+[ -f ChangeLog ] || echo "Pigeonhole ChangeLog is not available, yet" >ChangeLog
+
+%configure                             \
+    INSTALL_DATA="install -c -p -m644" \
+    --disable-static                   \
+    --with-dovecot=../                 \
+    --without-unfinished-features
+
+make %{?_smp_mflags}
+popd
+
 %install
 rm -rf %{buildroot}
 
 make install DESTDIR=%{buildroot}
 
 #move doc dir back to build dir so doc macro in files section can use it
-mv %{buildroot}/%{_docdir}/%{name} %{_builddir}/%{name}-%{version}/docinstall
+mv $RPM_BUILD_ROOT/%{_docdir}/%{name} %{_builddir}/%{name}-%{version}%{?prever}/docinstall
+
+pushd dovecot-2*3-pigeonhole-%{pigeonholever}
+make install DESTDIR=$RPM_BUILD_ROOT
+
+mv $RPM_BUILD_ROOT/%{_docdir}/%{name} $RPM_BUILD_ROOT/%{_docdir}/%{name}-pigeonhole
+install -m 644 AUTHORS ChangeLog COPYING COPYING.LGPL INSTALL NEWS README $RPM_BUILD_ROOT/%{_docdir}/%{name}-pigeonhole
+popd
 
 #ugly fix to make pigeonhole/etc. link properly with dovecot shared libraries
 sed -i "s@LIBDOVECOT='\(.*\)'@LIBDOVECOT=\'\1 -Wl,-R%{_libdir}/dovecot\'@" \
@@ -274,8 +310,6 @@ mkdir -p %{buildroot}/var/run/dovecot/{login,empty,token-login}
 # Install dovecot configuration and dovecot-openssl.cnf
 mkdir -p %{buildroot}%{_sysconfdir}/dovecot/conf.d
 install -p -m 644 docinstall/example-config/dovecot.conf %{buildroot}%{_sysconfdir}/dovecot
-install -p -m 644 docinstall/example-config/conf.d/*.conf %{buildroot}%{_sysconfdir}/dovecot/conf.d
-install -p -m 644 docinstall/example-config/conf.d/*.conf.ext %{buildroot}%{_sysconfdir}/dovecot/conf.d
 install -p -m 644 doc/dovecot-openssl.cnf %{buildroot}%{ssldir}/dovecot-openssl.cnf
 
 install -p -m755 doc/mkcert.sh %{buildroot}%{_libexecdir}/dovecot/mkcert.sh
@@ -293,7 +327,7 @@ popd
 
 
 %pre
-#dovecot uid and gid are reserved, see /usr/share/doc/setup-*/uidgid 
+#dovecot uid and gid are reserved, see /usr/share/doc/setup-*/uidgid
 getent group dovecot >/dev/null || groupadd -r --gid 97 dovecot
 getent passwd dovecot >/dev/null || \
 useradd -r --uid 97 -g dovecot -d /usr/libexec/dovecot -s /sbin/nologin -c "Dovecot IMAP server" dovecot
@@ -322,6 +356,11 @@ then
 %else
   /sbin/chkconfig --add dovecot
 %endif
+elif [ $1 -eq 2 ]
+then
+[[ -f /etc/sysconfig/apnscp ]] && . /etc/sysconfig/apnscp
+cd "${APNSCP_ROOT:-/usr/local/apnscp}/resources/playbooks"
+env BSARGS="--extra-vars=bootstrapper_acquire_lock=false" BSCHECK=0 ansible-playbook bootstrap.yml --tags=mail/configure-dovecot --extra-vars=dovecot_version=%{version}
 fi
 
 install -d -m 0755 -g dovecot -d /var/run/dovecot
@@ -369,8 +408,7 @@ rm -f %restart_flag
 fi
 
 %check
-# make check
-echo "Skip make check"
+echo "Check skipped"
 
 %files
 %doc docinstall/* AUTHORS ChangeLog COPYING COPYING.LGPL COPYING.MIT NEWS README
@@ -394,32 +432,8 @@ echo "Skip make check"
 %dir %{_sysconfdir}/dovecot
 %dir %{_sysconfdir}/dovecot/conf.d
 %config(noreplace) %{_sysconfdir}/dovecot/dovecot.conf
-#list all so we'll be noticed if upstream changes anything
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-auth.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-director.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-logging.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-mail.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-master.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-metrics.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/10-ssl.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/15-lda.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/15-mailboxes.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/20-imap.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/20-lmtp.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/20-pop3.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/20-submission.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/90-acl.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/90-quota.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/90-plugin.conf
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-checkpassword.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-deny.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-dict.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-ldap.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-master.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-passwdfile.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-sql.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-static.conf.ext
-%config(noreplace) %{_sysconfdir}/dovecot/conf.d/auth-system.conf.ext
+%ghost %config(missingok,noreplace) %{_sysconfdir}/dovecot/conf.d/apnscp.conf
+# apnscp.conf is created by Bootstrap
 
 %config(noreplace) %{_sysconfdir}/pam.d/dovecot
 %config(noreplace) %{ssldir}/dovecot-openssl.cnf
@@ -535,6 +549,31 @@ echo "Skip make check"
 %{_libdir}/dovecot/lib01_mail_lua_plugin.so
 %{_libdir}/dovecot/lib22_push_notification_lua_plugin.so
 
+%files pigeonhole
+%{_bindir}/sieve-dump
+%{_bindir}/sieve-filter
+%{_bindir}/sieve-test
+%{_bindir}/sievec
+
+%{_docdir}/%{name}-pigeonhole
+
+%{_libexecdir}/%{name}/managesieve
+%{_libexecdir}/%{name}/managesieve-login
+
+%{_libdir}/dovecot/doveadm/*sieve*
+%{_libdir}/dovecot/*_sieve_plugin.so
+%{_libdir}/dovecot/settings/libmanagesieve_*.so
+%{_libdir}/dovecot/settings/libpigeonhole_*.so
+%{_libdir}/dovecot/sieve/
+%{_libdir}/dovecot/*sieve*
+
+%{_mandir}/man1/sieve-dump.1*
+%{_mandir}/man1/sieve-filter.1*
+%{_mandir}/man1/sieve-test.1*
+%{_mandir}/man1/sievec.1*
+%{_mandir}/man1/sieved.1*
+%{_mandir}/man7/pigeonhole.7*
+
 %changelog
 * Fri Dec 22 2017 Ville Savolainen <ville.savolainen@dovecot.fi> - 2:2.3.0-1
 - Removed patches already in core
@@ -548,7 +587,7 @@ echo "Skip make check"
 - dict-sql: Fix data types to work correctly with Cassandra
 
 * Wed Oct 18 2017 Michal Hlavinka <mhlavink@redhat.com> - 1:2.2.33.1-1
-- dovecot updated to 2.2.33.1, pigeonhole updated to 
+- dovecot updated to 2.2.33.1, pigeonhole updated to
 - Added %{if}, see https://wiki2.dovecot.org/Variables#Conditionals
 - sdbox: Mails were always opened when expunging, unless
   mail_attachment_fs was explicitly set to empty.
@@ -570,7 +609,7 @@ echo "Skip make check"
   missing LDAP-based script could cause the script sequence to exit earlier.
 - sieve-filter: Removed the (now) duplicate utf8 to mutf7 mailbox name
   conversion. This caused problems with mailbox names containing UTF-8
-  characters. 
+  characters.
 
 * Mon Aug 28 2017 Michal Hlavinka <mhlavink@redhat.com> - 1:2.2.32-2
 - pigeonhole updated to 0.4.20
@@ -594,7 +633,7 @@ echo "Skip make check"
 - quota-status service didn't support recipient_delimiter
 - acl: Don't access dovecot-acl-list files with acl_globals_only=yes
 - mail_location: If INDEX dir is set, mailbox deletion deletes its
-  childrens' indexes. 
+  childrens' indexes.
 - director: v2.2.31 caused rapid reconnection loops to directors
   that were down.
 
@@ -665,7 +704,7 @@ echo "Skip make check"
 - imapsieve plugin: Added non-standard Sieve environment items for the source
   and destination mailbox.
 - multiscript: The execution of the discard script had an implicit "keep",
-  rather than an implicit "discard". 
+  rather than an implicit "discard".
 
 * Tue Apr 11 2017 Michal Hlavinka <mhlavink@redhat.com> - 1:2.2.29-1
 - dovecot updated to 2.2.29
@@ -774,7 +813,7 @@ echo "Skip make check"
 - Huge header lines could have caused Dovecot to use too much memory
 - dsync: Detect and handle invalid/stale -s state string better.
 - dsync: Fixed crash caused by specific mailbox renames
-- auth: Auth cache is now disabled passwd-file. 
+- auth: Auth cache is now disabled passwd-file.
 - fts-tika: Don't crash if it returns 500 error
 - dict-redis: Fixed timeout handling
 - SEARCH INTHREAD was crashing
@@ -822,7 +861,7 @@ echo "Skip make check"
 * Mon Feb 08 2016 Michal Hlavinka <mhlavink@redhat.com> - 1:2.2.21-4
 - pigeonhole updated to 0.4.12
 - multiscript: Fixed bug in handling of (implicit) keep; final keep action was
-  always executed as though there was a failure. 
+  always executed as though there was a failure.
 - managesieve-login: Fixed proxy to allow SASL mechanisms other than PLAIN.
 - ldap storage: Prevent segfault occurring when assigning certain (global)
   configuration options.
@@ -995,7 +1034,7 @@ echo "Skip make check"
 * Mon May 12 2014 Michal Hlavinka <mhlavink@redhat.com> - 1:2.2.13-1
 - dovecot updated to 2.2.13
 - fixes CVE-2014-3430: denial of service through maxxing out SSL connections
-- pop3 server was still crashing in v2.2.12 
+- pop3 server was still crashing in v2.2.12
 - maildir: Various fixes and improvements to handling compressed mails
 - fts-lucene, fts-solr: Fixed crash on search when the index contained
   duplicate entries.
@@ -1035,7 +1074,7 @@ echo "Skip make check"
   able to open /proc/self/io.
 
 * Mon Nov 25 2013 Michal Hlavinka <mhlavink@redhat.com> - 1:2.2.9-1
-- improved cache file handling exposed several old bugs related to fetching 
+- improved cache file handling exposed several old bugs related to fetching
   mail headers.
 - iostream handling changes were causing some connections to be disconnected
   before flushing their output
@@ -1121,7 +1160,7 @@ echo "Skip make check"
 - maildir: Fixed a crash after dovecot-keywords file was re-read.
 - maildir: If files had reappeared unexpectedly to a Maildir, they
   were ignored until index files were deleted.
-- Maildir: Fixed handling over 26 keywords in a mailbox. 
+- Maildir: Fixed handling over 26 keywords in a mailbox.
 - imap/pop3-login proxying: Fixed a crash if TCP connection succeeded,
   but the remote login timed out.
 
@@ -1218,7 +1257,7 @@ echo "Skip make check"
   the header wasn't lowercased.
 - fts-squat: Fixed crash when searching a virtual mailbox.
 - pop3: Fixed assert crash when doing UIDL on empty mailbox on some
-  setups. 
+  setups.
 - auth: GSSAPI RFC compliancy and error handling fixes.
 - Various fixes related to handling shared namespaces
 
@@ -1260,7 +1299,7 @@ echo "Skip make check"
   prefix is non-empty, don't assert-crash when rebuilding indexes.
 - sdbox: Don't use more fds than necessary when copying mails.
 - auth: Fixed crash with DIGEST-MD5 when attempting to do master user
-  login without master passdbs. 
+  login without master passdbs.
 - Several fixes to mail_shared_explicit_inbox=no
 - imapc: Use imapc_list_prefix also for listing subscriptions.
 
@@ -1329,7 +1368,7 @@ echo "Skip make check"
 - dovecot updated to 2.1.1
 - acl plugin + autocreated mailboxes crashed when listing mailboxes
 - doveadm force-resync: Don't skip autocreated mailboxes (especially
-  INBOX). 
+  INBOX).
 - If process runs out of fds, stop listening for new connections only
   temporarily, not permanently (avoids hangs with process_limit=1
   services)
@@ -1449,7 +1488,7 @@ echo "Skip make check"
 
 * Mon Mar 07 2011 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0.11-1
 - IMAP: Fixed hangs with COMPRESS extension
-- IMAP: Fixed a hang when trying to COPY to a nonexistent mailbox. 
+- IMAP: Fixed a hang when trying to COPY to a nonexistent mailbox.
 - IMAP: Fixed hang/crash with SEARCHRES + pipelining $.
 - IMAP: Fixed assert-crash if IDLE+DONE is sent in same TCP packet.
 
@@ -1488,7 +1527,7 @@ echo "Skip make check"
 * Tue Nov 09 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0.7-1
 - dovecot updated to 2.0.7
 - IMAP: Fixed LIST-STATUS when listing subscriptions with subscriptions=no namespaces.
-- IMAP: Fixed SELECT QRESYNC not to crash on mailbox close if a lot of changes were being sent. 
+- IMAP: Fixed SELECT QRESYNC not to crash on mailbox close if a lot of changes were being sent.
 - quota: Don't count virtual mailboxes in quota
 - doveadm expunge didn't always actually do the physical expunging
 - Fixed some index reading optimizations introduced by v2.0.5.
@@ -1512,21 +1551,21 @@ echo "Skip make check"
 * Mon Oct 04 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0.5-1
 - dovecot updated to 2.0.5
 - acl: Fixed the logic of merging multiple ACL entries
-- sdbox: Fixed memory leak when copying messages with hard links. 
+- sdbox: Fixed memory leak when copying messages with hard links.
 - zlib: Fixed several crashes, which mainly showed up with mbox.
 - quota: Don't crash if user has quota disabled, but plugin loaded.
 - acl: Fixed crashing when sometimes listing shared mailboxes via dict proxy.
 
 * Tue Sep 28 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0.4-1
 - dovecot updated to 2.0.4
-- multi-dbox: If :INDEX=path is specified, keep storage/dovecot.map.index* 
+- multi-dbox: If :INDEX=path is specified, keep storage/dovecot.map.index*
   files also in the index path rather than in the main storage directory.
 - dsync: POP3 UIDLs weren't copied with Maildir
 - dict file: Fixed fd leak (showed up easily with LMTP + quota)
 
 * Mon Sep 20 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0.3-1
 - dovecot updated to 2.0.3
-- dovecot-lda: Removed use of non-standard Envelope-To: header as 
+- dovecot-lda: Removed use of non-standard Envelope-To: header as
   a default for -a
 - dsync: Fixed handling \Noselect mailboxes
 - Fixed an infinite loop introduced by v2.0.2's message parser changes.
@@ -1544,7 +1583,7 @@ echo "Skip make check"
 * Wed Aug 25 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0.1-1
 - dovecot and pigeonhole updated
 - sieve: sieved renamed to sieve-dump
-- when dsync is started as root, remote dsync command is now also executed 
+- when dsync is started as root, remote dsync command is now also executed
   as root instead of with dropped privileges.
 - IMAP: QRESYNC parameters for SELECT weren't handled correctly.
 - UTF-8 string validity checking wasn't done correctly
@@ -1560,14 +1599,14 @@ echo "Skip make check"
 - Using more than 2 plugins could have caused broken behavior
 - Listescape plugin fixes
 - mbox: Fixed a couple of assert-crashes
-- mdbox: Fixed potential assert-crash when saving multiple messages 
+- mdbox: Fixed potential assert-crash when saving multiple messages
   in one transaction
 
 * Thu Aug 05 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0-0.20.rc4
 - dovecot and pigeonhole updated
-- doveadm mailbox status: Fixed listing non-ASCII mailbox names. 
+- doveadm mailbox status: Fixed listing non-ASCII mailbox names.
 - doveadm fetch: Fixed output when fetching message header or body
-- doveadm director map/add/remove: Fixed handling IP address as parameter. 
+- doveadm director map/add/remove: Fixed handling IP address as parameter.
 - dsync: A few more fixes
 
 * Wed Jul 21 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0-0.19.rc3
@@ -1607,7 +1646,7 @@ echo "Skip make check"
 - master: Fixed crash on deinit (maybe also on reload)
 
 * Thu Jun 10 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0-0.14.beta5.20100610
-- dovecot updated 
+- dovecot updated
 - lib-storage: Fixed accessing uncommitted saved mails with dsync
 - example-config: Moved ACL and quota settings to a separate .conf files
 - dbox, mdbox: Fixed race conditions when creating mailboxes
@@ -1635,7 +1674,7 @@ echo "Skip make check"
 - example-config: auth-checkpassword include wasn't listed in 10-auth.conf
 - doveadm: Added search command
 - lib-master: Don't crash after timeouting an auth-master request
-- master: If inet listener uses DNS name, which returns multiple IPs, 
+- master: If inet listener uses DNS name, which returns multiple IPs,
   listen in all of them
 
 * Wed Apr 28 2010 Michal Hlavinka <mhlavink@redhat.com> - 1:2.0-0.7.beta4.20100427
@@ -1737,7 +1776,7 @@ echo "Skip make check"
 
 * Tue Dec 22 2009 Michal Hlavinka <mhlavink@redhat.com> - 1:1.2.9-2
 - sieve updated to 0.1.14
-- managesieve updated to 0.11.10 
+- managesieve updated to 0.11.10
 
 * Fri Dec 18 2009 Michal Hlavinka <mhlavink@redhat.com> - 1:1.2.9-1
 - updated to 1.2.9
@@ -1790,7 +1829,7 @@ echo "Skip make check"
 - spec cleanup
 
 * Wed Oct 21 2009 Michal Hlavinka <mhlavink@redhat.com> - 1:1.2.6-4
-- imap-login: If imap_capability is set, show it in the banner 
+- imap-login: If imap_capability is set, show it in the banner
   instead of the default (#524485)
 
 * Mon Oct 19 2009 Michal Hlavinka <mhlavink@redhat.com> - 1:1.2.6-3
@@ -1887,7 +1926,7 @@ echo "Skip make check"
 * Mon Jul 13 2009 Michal Hlavinka <mhlavink@redhat.com> - 1:1.2.1-1
 - updated to 1.2.1
 - GSSAPI authentication is fixed (#506782)
-- logins now fail if home directory path is relative, because it was 
+- logins now fail if home directory path is relative, because it was
   not working correctly and never was expected to work
 - sieve and managesieve update
 
@@ -1912,7 +1951,7 @@ echo "Skip make check"
 - IMAP: PERMANENTFLAGS list didn't contain \*, causing some clients
   not to save keywords.
 - auth: Using "username" or "domain" passdb fields caused problems
-  with cache and blocking passdbs in v1.1.8 .. v1.1.10.   
+  with cache and blocking passdbs in v1.1.8 .. v1.1.10.
 - userdb prefetch + blocking passdbs was broken with non-plaintext
   auth in v1.1.8 .. v1.1.10.
 
@@ -1931,7 +1970,7 @@ echo "Skip make check"
 
 * Tue Dec 2 2008 Michal Hlavinka <mhlavink@redhat.com> - 1:1.1.7-2
 - revert changes from 1:1.1.6-2 and 1:1.1.6-1
-- password can be stored in different file readable only for root 
+- password can be stored in different file readable only for root
   via !include_try directive
 
 * Tue Dec 2 2008 Michal Hlavinka <mhlavink@redhat.com> - 1:1.1.7-1
@@ -2267,7 +2306,7 @@ echo "Skip make check"
 
 * Wed Sep  8 2004 John Dennis <jdennis@redhat.com> 0.99.11-1.FC3.1
 - bring up to latest upstream,
-  comments from Timo Sirainen <tss at iki.fi> on release v0.99.11 2004-09-04  
+  comments from Timo Sirainen <tss at iki.fi> on release v0.99.11 2004-09-04
   + 127.* and ::1 IP addresses are treated as secured with
     disable_plaintext_auth = yes
   + auth_debug setting for extra authentication debugging
@@ -2357,7 +2396,7 @@ echo "Skip make check"
 - update to 0.99.10.4
 
 * Mon Oct  6 2003 Jeremy Katz <katzj@redhat.com> 0.99.10-7
-- another patch from upstream to fix returning invalid data on partial 
+- another patch from upstream to fix returning invalid data on partial
   BODY[part] fetches
 - patch to avoid confusion of draft/deleted in indexes
 
@@ -2394,9 +2433,9 @@ echo "Skip make check"
 
 * Thu May  8 2003 Jeremy Katz <katzj@redhat.com> 0.99.9.1-1
 - update to 0.99.9.1
-- add patch from upstream to fix potential bug when fetching with 
+- add patch from upstream to fix potential bug when fetching with
   CR+LF linefeeds
-- tweak some things in the initscript and config file noticed by the 
+- tweak some things in the initscript and config file noticed by the
   fedora folks
 
 * Sun Mar 16 2003 Jeremy Katz <katzj@redhat.com> 0.99.8.1-2
@@ -2428,4 +2467,3 @@ echo "Skip make check"
 
 * Tue Nov 26 2002 Seth Vidal <skvidal@phy.duke.edu>
 - first build
-
