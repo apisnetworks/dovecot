@@ -360,7 +360,7 @@ elif [ $1 -eq 2 ]
 then
 [[ -f /etc/sysconfig/apnscp ]] && . /etc/sysconfig/apnscp
 cd "${APNSCP_ROOT:-/usr/local/apnscp}/resources/playbooks"
-env BSARGS="--extra-vars=bootstrapper_acquire_lock=false" BSCHECK=0 ansible-playbook bootstrap.yml --tags=mail/configure-dovecot --extra-vars=dovecot_version=%{version}
+env BSARGS="--extra-vars=bootstrapper_acquire_lock=false" BSCHECK=0 ansible-playbook bootstrap.yml --tags=mail/configure-dovecot --extra-vars="dovecot_version=%{version} yum_transaction_hook=update"
 fi
 
 install -d -m 0755 -g dovecot -d /var/run/dovecot
