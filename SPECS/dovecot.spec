@@ -29,7 +29,7 @@ Summary: Secure imap and pop3 server
 Name: dovecot
 Epoch: 2
 Version: 2.3.17.1
-Release: 1
+Release: 3.apnscp
 #dovecot itself is MIT, a few sources are PD, pigeonhole is LGPLv2
 License: MIT and LGPLv2
 Group: System Environment/Daemons
@@ -117,8 +117,9 @@ BuildRequires: libcurl-devel expat-devel
 
 BuildRequires: libzstd-devel
 Requires: libzstd
+Requires: dovecot23-apnscp
 
-
+Obsoletes: dovecot < %{version}-%{release}
 Obsoletes: dovecot-sqlite < %{epoch}:%{version}-%{release}, dovecot-ldap < %{epoch}:%{version}-%{release}, dovecot-gssapi < %{epoch}:%{version}-%{release}
 Conflicts: dovecot-sqlite > %{epoch}:%{version}-%{release}, dovecot-ldap > %{epoch}:%{version}-%{release}, dovecot-gssapi > %{epoch}:%{version}-%{release}, dovecot-pigeonhole > %{epoch}:%{version}-%{release}, dovecot-pigeonhole < %{epoch}:%{version}-%{release}
 
@@ -358,9 +359,11 @@ then
 %endif
 elif [ $1 -eq 2 ]
 then
+# NB: calling this from within a migration results in a lock during fact gathering, which inhibits the script from running
 [[ -f /etc/sysconfig/apnscp ]] && . /etc/sysconfig/apnscp
 cd "${APNSCP_ROOT:-/usr/local/apnscp}/resources/playbooks"
-env BSARGS="--extra-vars=bootstrapper_acquire_lock=false" BSCHECK=0 ansible-playbook bootstrap.yml --tags=mail/configure-dovecot --extra-vars="dovecot_version=%{version} yum_transaction_hook=update"
+rm -f storage/run/.ansible.lock
+ansible-playbook bootstrap.yml --tags=mail/configure-dovecot --extra-vars="dovecot_version=%{version} yum_transaction_hook=update bootstrapper_acquire_lock=false"
 fi
 
 install -d -m 0755 -g dovecot -d /var/run/dovecot
