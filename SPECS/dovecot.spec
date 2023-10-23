@@ -370,8 +370,8 @@ fi
 
 install -d -m 0755 -g dovecot -d /var/run/dovecot
 install -d -m 0755 -d /var/run/dovecot/empty
-install -d -m 0750 -g dovecot -d /var/run/dovecot/login
-install -d -m 0755 -g dovecot -d /var/run/dovecot/token-login
+install -d -m 0750 -g dovenull -d /var/run/dovecot/login
+install -d -m 0755 -g dovenull -d /var/run/dovecot/token-login
 [ -x /sbin/restorecon ] && /sbin/restorecon -R /var/run/dovecot
 
 %preun
