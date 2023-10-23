@@ -28,14 +28,14 @@
 Summary: Secure imap and pop3 server
 Name: dovecot
 Epoch: 2
-Version: 2.3.17.1
-Release: 3.apnscp
+Version: 2.3.21
+Release: 1.apnscp
 #dovecot itself is MIT, a few sources are PD, pigeonhole is LGPLv2
 License: MIT and LGPLv2
 Group: System Environment/Daemons
 
 URL: http://www.dovecot.org/
-Source: %{name}_%{version}.orig.tar.gz
+Source: %{name}-%{version}.tar.gz
 Source1: dovecot.init
 Source2: dovecot.pam
 Source8: http://pigeonhole.dovecot.org/releases/2.3/dovecot-2.3-pigeonhole-%{pigeonholever}.tar.gz
@@ -56,6 +56,7 @@ Patch6: dovecot-2.1.10-waitonline.patch
 
 Patch8: dovecot-initbysystemd.patch
 #Patch9: dovecot-2.2.22-systemd_w_protectsystem.patch
+Patch10: dovecot-2.3.21-pwdbuf.patch
 
 Source15: prestartscript
 
@@ -188,6 +189,7 @@ This package provides LUA scripting support for Dovecot Community Edition
 #%patch7 -p1 -b .online
 %patch8 -p1 -b .initbysystemd
 #%patch9 -p1 -b .systemd_w_protectsystem
+%patch10 -p1 -b .pwdbuf
 
 %if %{?fedora}0 > 150 || %{?rhel}0 >60
 sed -i '/DEFAULT_INCLUDES *=/s|$| '"$(pkg-config --cflags libclucene-core)|" src/plugins/fts-lucene/Makefile.in
